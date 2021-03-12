@@ -1,0 +1,70 @@
+filebeat.inputs:
+- type: log
+  paths:
+    - /filebeat/data/*.*
+- type: docker
+  enabled: true
+  combine_partial: true
+  containers:
+    #path: "/usr/share/dockerlogs/data"
+    stream: "stdout"
+    ids:
+      - "*"
+  exclude_files: ['\.gz$']
+  ignore_older: 10m
+  processors:
+  # decode the log field (sub JSON document) if JSON encoded, then maps it's fields to elasticsearch fields
+  - decode_json_fields:
+      fields: ["log", "message"]
+      target: ""
+    # overwrite existing target elasticsearch fields while decoding json fields    
+      overwrite_keys: true
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+
+- type: httpjson
+  tags: ["london"]
+  config_version: 2
+  interval: 1m
+  request.url: http://api.openweathermap.org/data/2.5/weather?q=London,uk&APPID=7dbe7341764f682c2242e744c4f167b0&units=metric
+  processors:
+  # decode the log field (sub JSON document) if JSON encoded, then maps it's fields to elasticsearch fields
+    - decode_json_fields:
+        fields: ["message"]
+        target: "json"
+    # overwrite existing target elasticsearch fields while decoding json fields    
+        overwrite_keys: true
+- type: httpjson
+  tags: ["paris"]
+  config_version: 2
+  interval: 1m
+  request.url: http://api.openweathermap.org/data/2.5/weather?q=Paris,fr&APPID=7dbe7341764f682c2242e744c4f167b0&units=metric
+  processors:
+  # decode the log field (sub JSON document) if JSON encoded, then maps it's fields to elasticsearch fields
+    - decode_json_fields:
+        fields: ["message"]
+        target: "json"
+    # overwrite existing target elasticsearch fields while decoding json fields    
+        overwrite_keys: true
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# setup filebeat to send output to logstash
+output.logstash:
+  enabled: true
+  hosts: ["logstash:5044"]
+
+
+# Write Filebeat own logs only to file to avoid catching them with itself in docker log files
+logging.level: error
+logging.to_files: false
+logging.to_syslog: false
+loggins.metrice.enabled: false
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+ssl.verification_mode: none

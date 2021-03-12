@@ -1,0 +1,21 @@
+heartbeat.monitors:
+- type: http
+  schedule: '@every 10s'
+  urls:
+    - http://api.openweathermap.org/data/2.5/weather?q=London,uk&APPID=7dbe7341764f682c2242e744c4f167b0&units=metric
+    - https://google.com
+
+  check.request:
+    method: GET
+    headers:
+        'Content-Type': 'application/json' 
+  check.response:
+       status: 200
+       
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  username: elastic
+  password: bestprice
+setup.kibana:
+  host: "kibana:5601"

@@ -1,0 +1,117 @@
+version: '3.2'
+
+services:
+  redis:
+    image: redis:6.2.1
+    container_name: redis
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis-data:/redis/data
+    networks:
+      - monitorservice
+  filebeat:
+    hostname: filebeat/
+    image: monitorservice/filebeat:1.0.0
+    build:
+      context: filebeat
+    volumes:
+      # needed to access all docker logs (read only) :
+     - "/var/lib/docker/containers:/usr/share/dockerlogs/data:ro"
+      # needed to access additional informations about containers
+     - "/var/run/docker.sock:/var/run/docker.sock"
+     - ./data/:/filebeat/data/
+    links:
+       - logstash
+    networks: 
+    - monitorservice
+  heartbeat:
+     build:
+      context: heartbeat
+    #  volumes:
+    #    - ./heartbeat/config/heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
+     environment:
+       - output.elasticsearch.hosts=["elasticsearch:9200"]
+     networks:
+       - monitorservice
+     depends_on:
+       - elasticsearch
+     restart: always
+  kibana:
+    hostname: kibana
+    image: monitorservice/kibana:1.0.0
+    build:
+      context: kibana/
+    environment:
+      - "LOGGING_QUIET=true"
+    links:
+      - elasticsearch
+    ports:
+      - 5601:5601
+    networks: 
+    - monitorservice
+    depends_on:
+    - elasticsearch
+  logstash: 
+    hostname: logstash
+    image: monitorservice/logstash:1.0.0
+    build:
+      context: logstash/
+    ports:
+      - 5044:5044
+      - 9600:9600
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    links:
+      - elasticsearch
+    networks: 
+    - monitorservice
+  elasticsearch:
+    hostname: elasticsearch
+    image: monitorservice/elasticsearch:1.0.0
+    build:
+      context: elasticsearch/
+    environment:
+      cluster.name: monitorservice-cluster
+      bootstrap.memory_lock: "true"
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms256m -Xmx256m"
+      ELASTIC_PASSWORD: bestprice
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks: 
+    - monitorservice
+  grafana:
+    image: grafana/grafana
+    ports:
+    - 4000:3000
+    volumes:
+    - ./data2:/var/lib/grafana
+    - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+    user: "1000"
+    restart: always
+    links:
+    - elasticsearch
+    networks: 
+    - monitorservice
+    depends_on:
+    - elasticsearch
+  apm_server:
+    build:
+      context: apm/
+    volumes:
+      - ./apm/config/:/usr/share/apm/config:ro
+    ports:
+      - "8200:8200"
+    networks:
+      - monitorservice
+    depends_on:
+      - elasticsearch
+networks:
+ monitorservice:
+   driver: bridge

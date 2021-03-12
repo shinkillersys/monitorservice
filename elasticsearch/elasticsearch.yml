@@ -1,0 +1,8 @@
+cluster.name: ${cluster.name}
+network.host: 0.0.0.0
+
+xpack.license.self_generated.type: basic
+xpack.security.enabled: true
+xpack.monitoring.collection.enabled: true
+http.cors.enabled: true
+http.cors.allow-origin: "*"
